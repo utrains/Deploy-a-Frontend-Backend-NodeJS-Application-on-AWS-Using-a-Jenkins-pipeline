@@ -227,62 +227,43 @@ locals {
 
 # ~~~~ Log in to the aws ECR service of the current account to have enough rights to push images in ecr ~~~~
 
-resource "null_resource" "ecr-login" {
-	
-	  provisioner "local-exec" {
+# Build script
+resource "local_file" "docker_build_script" {
+  content = <<-EOT
+    #!/bin/bash
+    
+    # Build The Frontend Image from the Dockerfile of the frontend
+    echo "Building frontend Docker image from the Dockerfile of the frontend"
+    ${local.docker-build-frontend}
 
-	    command = local.ecr-login
+    # Build The Backend Image from the Dockerfile of the backend
+    echo "Building backend Docker image from the Dockerfile of the backend"
+    ${local.docker-build-backend}
+  EOT
 
-	  }
-  depends_on = [ aws_ecr_repository.repository-backend , aws_ecr_repository.repository-frontend ]
+  filename        = "${path.module}/docker-build-script.sh"
+  file_permission = "0755"
 }
 
-# ~~~~~~~~~~~ Build The Frontend Image from the Dockerfile of the frontend ~~~~~~~~~~
+# Push script
+resource "local_file" "docker_push_script" {
+  content = <<-EOT
+    #!/bin/bash
+    
+    echo "Logging in to ECR"
+    ${local.ecr-login}
 
-resource "null_resource" "docker-build-frontend" {
-	
-	  provisioner "local-exec" {
+    # Push The Frontend Image to the frontend ECR repository
+    echo "Pushing frontend Docker image to the frontend ECR repository"
+    ${local.docker-push-frontend}
 
-	    command = local.docker-build-frontend
+    # Push The Backend Image to the backend ECR repositor
+    echo "Pushing backend Docker image. to the backend ECR repository"
+    ${local.docker-push-backend}
+  EOT
 
-	  }
-  depends_on = [ null_resource.ecr-login ]
-}
-
-# ~~~~~~~~~~~~~~~ Push The Frontend Image the frontend ECR repository ~~~~~~~~~~~~~~
-
-resource "null_resource" "push-to-ecr-frontend" {
-	
-	  provisioner "local-exec" {
-
-	    command = local.docker-push-frontend
-
-	  }
-  depends_on = [ null_resource.docker-build-frontend ]
-}
-
-# ~~~~~~~~~~~ Build The Backend Image from the Dockerfile of the backend ~~~~~~~~~~~
-
-resource "null_resource" "docker-build-backend" {
-	
-	  provisioner "local-exec" {
-
-	    command = local.docker-build-backend
-
-	  }
-  depends_on = [ null_resource.ecr-login ]
-}
-
-# ~~~~~~~~~~~~~~~ Push The Backend Image to the backend ECR Repository ~~~~~~~~~~~~~
-
-resource "null_resource" "push-to-ecr-backend" {
-	
-	  provisioner "local-exec" {
-
-	    command = local.docker-push-backend
-
-	  }
-  depends_on = [ null_resource.docker-build-backend ]
+  filename        = "${path.module}/docker-push-script.sh"
+  file_permission = "0755"
 }
 
 # ~~~~~~~~~~ Clean Up docker images too when the infrastructure is destoyed ~~~~~~~~~
@@ -291,7 +272,7 @@ resource "null_resource" "clean-up-images" {
 	
 	  provisioner "local-exec" {
 
-        when = destroy
+      when = destroy
 	    command =<<EOF
 		          docker rmi `docker image ls | grep "end-repo" | awk '{print $1}'`
 		          EOF
