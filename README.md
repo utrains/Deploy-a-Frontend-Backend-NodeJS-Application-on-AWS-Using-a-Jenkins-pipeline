@@ -2,6 +2,7 @@
 
 The following lines will guide you through using the GitHub Actions pipeline to deploy a Node.js application on AWS. The pipeline leverages AWS OIDC Roles for secure and passwordless authentication.
 
+
 ## Prerequisites
 
 Before you start, ensure the following are in place:
@@ -22,8 +23,7 @@ Before you start, ensure the following are in place:
 - Enable GitHub Actions.
 - Grant the workflow permission to request OIDC tokens (`id-token: write`).
 - Set repository environment for manual approvals (optional for destroy jobs).
-
----
+  
 
 ## Pipeline Environment Variables
 
