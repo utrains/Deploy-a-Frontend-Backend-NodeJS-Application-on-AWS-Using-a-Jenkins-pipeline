@@ -8,6 +8,7 @@ env:
     FRONTEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-frontend-repo
     BACKEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-backend-repo
     TAG: latest
+    OIDC_ROLE_ARN: arn:aws:iam::885684264653:role/github-actions-oidc-role
 
 jobs:
 
@@ -37,7 +38,7 @@ jobs:
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           
       - name: terraform init & plan
@@ -82,7 +83,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           audience: sts.amazonaws.com 
-          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -141,7 +142,7 @@ jobs:
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Use the ecs-apply-plan.tfplan artifact
@@ -167,7 +168,7 @@ jobs:
       name: destroy-approval # Environment requiring manual approval
     steps:
       - name: Wait for Approval
-        run: echo "Waiting for manual approval to destroy resources..."
+        run: echo "Waiting for manual approval to destroy resources"
 
 
 # The destroy Job - Download the Artifact. Here is the terraform.tfstate file generated in the apply step 
@@ -197,7 +198,7 @@ jobs:
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
             
       - name: Download artifact
@@ -219,7 +220,7 @@ jobs:
       name: destroy-approval # Environment requiring manual approval
     steps:
       - name: Wait for Approval
-        run: echo "Waiting for manual approval to destroy resources..."
+        run: echo "Waiting for manual approval to destroy resources"
 
   destroy-ecr:
     runs-on: ubuntu-latest
@@ -247,7 +248,7 @@ jobs:
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
             
       - name: Download artifact
