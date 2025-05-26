@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
 
 env:
-    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     AWS_REGION: us-east-2
     FRONTEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-frontend-repo
     BACKEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-backend-repo
@@ -16,6 +14,10 @@ jobs:
 # Create the infrastructure on AWS with the ressources in the ecr directory
   Create-the-infrastructure-in-AWS:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read 
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -32,6 +34,12 @@ jobs:
             verbose: false                     
             arch: amd64
             
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          aws-region: ${{ env.AWS_REGION }}
+          
       - name: terraform init & plan
         run: |
             cd ecr
@@ -75,7 +83,7 @@ jobs:
         with:
           audience: sts.amazonaws.com 
           role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
-          aws-region: us-east-2
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login_ecr
@@ -110,6 +118,10 @@ jobs:
   Apply-the-terraform-code-to-Launch-the-frontend-and-the-backend-app:
     runs-on: ubuntu-latest
     needs: Build-and-Push-backend-and-frontend-images-to-ECR
+    permissions:
+      id-token: write
+      contents: read
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -125,6 +137,12 @@ jobs:
             version: 2                         
             verbose: false                     
             arch: amd64    
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Use the ecs-apply-plan.tfplan artifact
         run: |
@@ -156,6 +174,10 @@ jobs:
   destroy-ecs:
     runs-on: ubuntu-latest
     needs: wait-for-ecs-destroy-approval
+    permissions:
+      id-token: write
+      contents: read
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -171,6 +193,12 @@ jobs:
             version: 2                         
             verbose: false                     
             arch: amd64
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          aws-region: ${{ env.AWS_REGION }}
             
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -196,6 +224,10 @@ jobs:
   destroy-ecr:
     runs-on: ubuntu-latest
     needs: wait-for-ecr-approval
+    permissions:
+      id-token: write
+      contents: read
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -211,6 +243,12 @@ jobs:
             version: 2                         
             verbose: false                     
             arch: amd64
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::885684264653:role/github-actions-oidc-role
+          aws-region: ${{ env.AWS_REGION }}
             
       - name: Download artifact
         uses: actions/download-artifact@v4
