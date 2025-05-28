@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
 
 env:
-    AWS_REGION: us-east-2
+    OIDC_ROLE_ARN: arn:aws:iam::885684264653:role/github-actions-oidc-role
     FRONTEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-frontend-repo
     BACKEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-backend-repo
+    AWS_REGION: us-east-2
     TAG: latest
-    OIDC_ROLE_ARN: arn:aws:iam::885684264653:role/github-actions-oidc-role
 
 jobs:
 
@@ -43,20 +43,16 @@ jobs:
           
       - name: terraform init & plan
         run: |
-            cd ecr
+            cd infra
             terraform init 
             terraform apply -auto-approve 
-
-      - name: Print the Terraform State file ecr terraform.tfstate
-        run: |
-            cd ecr
-            cat terraform.tfstate
+            
     
-      - name: Upload the Terraform State file ecr.tfstate
+      - name: Upload the Terraform State file of the infrastructure
         uses: actions/upload-artifact@v4
         with:
-          name: ecr-terraform-state-file
-          path: ecr/terraform.tfstate
+          name: infra-terraform-state-file
+          path: infra/terraform.tfstate
           
 
 # Build and Push the backend and frontend images to the ECR repository previously created using the docker-build-script.sh and docker-push-script.sh generated
@@ -92,8 +88,7 @@ jobs:
 
       - name: Build backend and frontend Docker images
         run: |
-          ls
-          cd ecr
+          cd infra
     
           # Build The Frontend Image from the Dockerfile of the frontend
           echo "Building frontend Docker image from the Dockerfile of the frontend"
@@ -105,7 +100,6 @@ jobs:
 
       - name: Push backend and frontend Docker images
         run: |
-          ls
           # Push The Frontend Image to the frontend ECR repository
             echo "Pushing frontend Docker image to the frontend ECR repository"
             docker push $FRONTEND_REPO:$TAG 
@@ -254,7 +248,7 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: ecr-terraform-state-file
+          name: infra-terraform-state-file
 
       - name: Use the terraform-state artifact
         run: |
