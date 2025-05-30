@@ -1,4 +1,4 @@
-# Deploy a Node.js App on AWS using GitHub Actions with OIDC
+# Deploy a Node.js App on ECS using GitHub Actions with OIDC role
 
 The following lines will guide you through using the GitHub Actions pipeline to deploy a Node.js application on AWS. The pipeline leverages AWS OIDC Roles for secure and passwordless authentication.
 
@@ -157,7 +157,101 @@ jobs:
       - name: Display caller identity
         run: aws sts get-caller-identity
 ```
-  
+
+### Using Manual Approval in GitHub Actions Workflows
+
+In some CI/CD scenarios when dealing with destructive infrastructure operations like tearing down environments, it's important to require **manual approval** before executing. GitHub Actions provides this functionality via **Environments** with required reviewers. We will see now  how to implement manual approval step-by-step:
+
+
+#### 1. Create an Environment with Required Reviewers
+
+1. Navigate to your GitHub repository.
+2. Go to **Settings > Environments**.
+3. Create a new environment named `destroy-approval`.
+4. Under **Deployment protection rules**, add required reviewers (your GitHub username or a team).
+5. Save the environment.
+
+> This ensures any job using this environment will pause for approval before execution.
+
+---
+
+### 2. Define Workflow Jobs in `destroy.yml`
+
+#### Apply Job
+
+This job is assumed to run prior and generate a `terraform.tfstate` file saved as an artifact.
+
+##### Manual Approval Job
+
+```yaml
+wait-for-ecs-destroy-approval:
+  runs-on: ubuntu-latest
+  needs: Apply-the-terraform-code-to-Launch-the-frontend-and-the-backend-app
+  environment:
+    name: destroy-approval  # Triggers manual approval
+  steps:
+    - name: Wait for Approval
+      run: echo "Waiting for manual approval to destroy resources"
+```
+
+This job will not run until a GitHub reviewer approves it in the Actions tab.
+
+##### Destroy Job
+
+```yaml
+destroy-ecs:
+  runs-on: ubuntu-latest
+  needs: wait-for-ecs-destroy-approval
+  permissions:
+    id-token: write
+    contents: read
+
+  steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+
+    - name: Install AWS CLI
+      uses: unfor19/install-aws-cli-action@v1
+      with:
+        version: 2
+        verbose: false
+        arch: amd64
+
+    - name: Configure AWS Credentials Using OIDC
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Download Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ecs-terraform-state-file
+
+    - name: Use the terraform-state artifact
+      run: |
+        terraform init -input=false
+        terraform refresh
+        terraform destroy -auto-approve
+```
+
+---
+
+#### How to Trigger Manual Approval?
+
+1. Push code or trigger the workflow manually.
+2. The workflow will pause at the `wait-for-ecs-destroy-approval` job.
+3. Go to **Actions > Workflow Run > Approval Job**.
+4. Click **Review deployments**.
+5. Click **Approve and deploy**.
+
+Once approved, the `destroy-ecs` job will run.
+
 
 ## Pipeline Environment Variables
 
