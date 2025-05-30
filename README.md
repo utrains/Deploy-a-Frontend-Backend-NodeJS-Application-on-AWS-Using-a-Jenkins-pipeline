@@ -2,27 +2,161 @@
 
 The following lines will guide you through using the GitHub Actions pipeline to deploy a Node.js application on AWS. The pipeline leverages AWS OIDC Roles for secure and passwordless authentication.
 
+Before lauching this pipeline, ensure the following are in place:
 
-## Prerequisites
+## AWS Account
 
-Before you start, ensure the following are in place:
-
-### AWS Account
-
-- Create an IAM Role (e.g., `github-actions-oidc-role`) with appropriate permissions to manage ECR, ECS, and Terraform.
+- Create an IAM Role (`github-actions-oidc-role` in this case) with appropriate permissions to manage ECR, ECS, and Terraform.
 - Configure the IAM Role trust policy to allow GitHub’s OIDC provider for your repository.
 
-### GitHub Repository
+### Create an AWS IAM role that GitHub Actions can assume using OpenID Connect (OIDC)
 
-- Contains your Node.js app source code.
-- Includes Terraform configuration for infrastructure (under `ecr/` directory).
-- Includes Dockerfiles for backend and frontend under `ecr/backend` and `ecr/frontend`.
+This setup allows GitHub Actions to authenticate with AWS without requiring long-lived credentials.
 
-### GitHub Repository Settings
+We need to create an IAM role named `github-actions-oidc-role` with the following AWS managed policies:
+
+* `AmazonEC2ContainerRegistryFullAccess`
+* `AmazonEC2ContainerRegistryPowerUser`
+* `AmazonEC2FullAccess`
+* `AmazonECS_FullAccess`
+* `IAMFullAccess`
+
+The role will trust GitHub’s OIDC provider to allow workflows from thr repository to assume the role.
+
+**Prerequisites**
+
+* Access to an AWS account with permissions to create IAM roles and identity providers.
+* A GitHub repository where this role will be used.
+* Basic knowledge of GitHub Actions and AWS IAM.
+
+
+#### Step 1: Create the OIDC Identity Provider in AWS
+
+1. Sign in to the AWS Management Console.
+
+2. Navigate to **IAM** > **Identity Providers**.
+
+3. Click **Add provider**.
+
+4. Set the **Provider type** to `OIDC`.
+
+5. For **Provider URL**, enter:
+
+   ```
+   https://token.actions.githubusercontent.com
+   ```
+
+6. For **Audience**, enter:
+
+   ```
+   sts.amazonaws.com
+   ```
+
+7. Click **Add provider** to save.
+
+
+#### Step 2: Create the IAM Role `github-actions-oidc-role`
+
+1. Go to **IAM** > **Roles**.
+
+2. Click **Create role**.
+
+3. Select **Web identity** as the trusted entity type.
+
+4. Choose the OIDC provider you created: `token.actions.githubusercontent.com`.
+
+5. Set the **Audience** to `sts.amazonaws.com`.
+
+6. Replace:
+
+   * `<OWNER>` with your GitHub username or organization: utrains
+   * `<REPO>` with your repository name: Deploy-a-NodeJS-Application-on-AWS-Using-GithubActions
+   * `<BRANCH>` with the branch name: GithubAction
+
+7. Click **Next** to proceed.
+
+
+#### Step 3: Attach Permissions
+
+Attach the following AWS managed policies to the role:
+
+* `AmazonEC2ContainerRegistryFullAccess`
+* `AmazonEC2ContainerRegistryPowerUser`
+* `AmazonEC2FullAccess`
+* `AmazonECS_FullAccess`
+* `IAMFullAccess`
+
+Then click **Next**.
+
+
+#### Step 4: Name the Role
+
+* **Role name**: `github-actions-oidc-role`
+* Add tags as needed (optional)
+* Click **Create role**
+
+
+#### Step 5: Save the Role ARN
+
+After creation, copy the **Role ARN** from the role summary page. It will look like this:
+
+```
+arn:aws:iam::123456789012:role/github-actions-oidc-role
+```
+
+
+## GitHub Repository
+
+- Contains the Node.js app source code.
+- Includes Terraform configuration for infrastructure (under `infra/` directory).
+- Includes Dockerfiles for backend and frontend under `infra/backend` and `infra/frontend`.
+
+## GitHub Repository Settings
 
 - Enable GitHub Actions.
 - Grant the workflow permission to request OIDC tokens (`id-token: write`).
-- Set repository environment for manual approvals (optional for destroy jobs).
+- Set repository environment for manual approvals (for destroy jobs).
+
+### Configure GitHub Actions
+
+1. In your GitHub repository, go to **Settings** > **Secrets and variables** > **Actions**.
+
+2. Add a new secret:
+
+   * Name: `AWS_ROLE_ARN`
+   * Value: Paste the Role ARN you copied earlier.
+
+3. Use the role in your GitHub Actions workflow like this:
+
+```yaml
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Display caller identity
+        run: aws sts get-caller-identity
+```
   
 
 ## Pipeline Environment Variables
@@ -35,6 +169,6 @@ env:
   FRONTEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-frontend-repo
   BACKEND_REPO: 885684264653.dkr.ecr.us-east-2.amazonaws.com/node-backend-repo
   TAG: latest
-  OIDC_ROLE_ARN: arn:aws:iam::885684264653:role/github-actions-oidc-role
+  OIDC_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 ```
  - Replace the AWS Account ID and role ARN with your own values.
